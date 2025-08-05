@@ -1,0 +1,971 @@
+let windowWidth = window.innerWidth;
+let windowHeight =  window.innerHeight;
+let scaleFactor = 8;
+
+// Rows currently made. Starts at 0, and updates with maxTableDepth.
+let numRows = 0;
+// How "long" a column is, i.e., how many posts the column with the most posts has. This var can and will change with the board.
+let maxTableDepth = 3;
+// TO DO: Create a new table in the database to hold column names and depths. Keep "maxTableDepth" when you do this, though change the value to a max within this table's depth values.
+// This let can and will change with the board.
+let numColumns = 3;
+
+let columnWidth = Math.round(windowWidth/scaleFactor);
+// Should remain constant, but I won't use a const because I'm not sure how old users' computers may be.
+let rowHeight = Math.round(windowHeight/(scaleFactor/2));
+
+// Assuming it works, there is a Post array "queriedPosts" and a tableColumn array "queriedColumns" created in the HTML template, and you can still use them here. These following vars are built from them.
+let queriedColumns;
+let columnNames = [];
+let columnDepths = [];
+let queriedPosts;
+let totalPosts;
+
+// Static values
+const priorityValues = ["Low", "Not Critical", "Normal", "High"];
+
+
+// Post sorting parameters
+// TO DO: Implement sorting by title, deadline, priority, and user.
+// sortTypes denotes the possible filters for projects, sortBy becomes the filter chosen when a filter is made, and orderAsc is a boolean for whether or not the projects are sorted in ascending order or not.
+const sortTypes = ["title", "deadline", "priority", "user"];
+let sortBy = "";
+let orderAsc = 0;
+
+
+
+/* [][][] DEBUG [][][] */
+
+// For when I'm messed up, homie, you're messed up...
+function beAlright()
+{
+	console.log
+	(
+		"Right, here are your values:\n \
+		Window width = " + windowWidth + "px\n \
+		Window height = " + windowHeight + "px\n \
+		Scale factor = " + scaleFactor + "\n \
+		Column width = " + columnWidth + "px\n \
+		Number of columns = " + numColumns + "\n \
+		Row height = " + rowHeight + "px\n \
+		Number of rows = " + numRows + "\n \
+		Max posts in one column (Max table depth) = " + maxTableDepth-1 + "\n \
+		Internal max table depth (includes blank posts) = " + maxTableDepth + "\n\n \
+		Queried columns = " + queriedColumns + "\n\n \
+		Column names = " + columnNames + "\n \
+		Column depths = " + columnDepths + "\n"
+	);
+	return;
+}
+
+
+
+/* [][][] INTERACTION [][][] */
+
+// Called when posts are moved within the table.
+// If going to a blank space after creation or once the page is loaded, insert all inner HTML into the space. If going to an occupied space, swap the inner HTML of both posts.
+// If going between spaces, insert the inner HTML into the lower post space and move all other posts down.
+// option = # of the option used (int), post = post being moved (HTML div) , targetId = target post space id, in the format "postSpace_x_y" (string)
+function processPost(option, post, postId, targetId)
+{
+    //console.log("PI = " + post.id + "   TI = " + targetId);
+    let target = document.getElementById(targetId);
+    let movingPost = post;
+    switch(option)
+    {
+        // Into a space
+        case(0):
+            //console.log("target id")
+            //console.log("target first child id = " + target.firstChild.id);
+            //console.log("target first child innerHTML = " + target.firstChild.innerHTML);
+            if(target.firstChild.innerHTML == "")
+            {
+                console.log("Blank space");
+                //console.log(movingPost.innerHTML);
+                target.firstChild.appendChild(movingPost);
+            }
+            else
+            {
+                console.log("Swap spaces");
+                //console.log(movingPost.innerHTML);
+                //console.log(target.firstChild.innerHTML);
+                let tempPost = document.createElement("table");
+                tempPost.innerHTML = target.innerHTML;
+                target.innerHTML = movingPost;
+                document.getElementById(postId).innerHTML = tempPost.innerHTML;
+
+                // Swap post ids too, though what you want to do eventually is to change the columns and set last depths.
+                document.getElementById(postId).id = targetId;
+                target.id = postId;
+            }
+            break;
+        // Between posts (i.e., hitting the edges of the post space)
+        // TO DO: This, but to be honest it can wait... focus on database submissions.
+        case(1):
+            if(target.className == "postSpace")
+            {
+                console.log("Between posts");
+                target.firstChild.innerHTML = movingPost.innerHTML;
+            }
+            break;
+        // Shouldn't fire, but just in case...
+        default:
+            console.log("ooooh it's defaulting oooooh");
+            targetPost.innerHTML = movingPost.innerHTML;
+    }
+    return;
+}
+
+
+
+/* [][][] TABLE CREATION [][][] */
+
+// Set column width for all columns.
+// className = HTML class name to target specific HTML elements (string)
+function formatAsColumns(className)
+{
+	let boardColumns = document.getElementsByClassName(className);
+	// Empty check
+	if(boardColumns == null)
+	{ return; }
+	let result = 0;
+	let capColumnsAt = scaleFactor;
+	//console.log("Window width = " + windowWidth + " px");
+
+	// If the board has 6+ columns, cap column width at 1/6 window width (6 by default).
+	// This only works if the children elements (basically just the one for text) also change width.
+	//console.log(totalBoardColumns >= capColumnsAt);
+	if(numColumns >= capColumnsAt)
+	{
+		//console.log(boardColumns);
+		let stringWidth = Math.round(100/scaleFactor);
+		console.log("Calculated width = " + stringWidth + "% of " + windowWidth + " = " + stringWidth*windowWidth/100 + "px");
+		for(let a=0; a<boardColumns.length; a++)
+		{
+			boardColumns[a].style.width = stringWidth + ("%");
+			boardColumns[a].children[0].style.width = stringWidth + ("%");
+		}
+		result = Math.round(100/scaleFactor);
+	}
+	// Otherwise, set column width such that width is distributed evenly.
+	else
+	{
+	    //console.log("Calculated width = " + 100/numColumns + "% of " + windowWidth + " = " + windowWidth/numColumns + "px");
+	    // I don't know why setting this low gets things to work, but as long as it works I'm ok with it.
+	    // Someday I'll fix this, probably by formatting the table headers and posts separately.
+	    let width = 1;
+		for(let a=0; a<boardColumns.length; a++)
+		{
+			//boardColumns[a].style.width = Math.round(windowWidth/numColumns) + "px";
+			//boardColumns[a].children[0].style.width = Math.round(windowWidth/numColumns) + "px";
+
+			// This controls the size of the column headers and the background post spaces.
+			boardColumns[a].style.width = width + "%";
+			//console.log(boardColumns[a].style.width);
+			// This controls the size of the links and the post drag boxes.
+			boardColumns[a].children[0].style.width = "85%";
+		}
+		result =  Math.round(100/numColumns);
+	}
+	// Saving the column width for future formatting...
+	columnWidth = result;
+	//console.log("Board columns formatted! Width = " + 100/numColumns + "% of " + windowWidth + " = " + windowWidth/numColumns + "px");
+	return;
+}
+
+// Create a row for posts within the board table.
+// This should be called whenever a post is dragged to a non-empty column that has the same amount of posts as the longest column.
+function createPostRow()
+{
+	let newRow = document.createElement("tr");
+	// Keep in mind that these are numbered starting from 0, rather than 1. It's caused some headache but everything's working fine.
+	newRow.id = "row" + numRows;
+	//console.log(newRow.id + "\n");
+	//console.log("Making row #" + (numRows + 1) + "...");
+	if(numRows >= maxTableDepth)
+	{
+		maxTableDepth++;
+	}
+	numRows++;
+	newRow.style.height = rowHeight +"px";
+	for(let a=0; a<numColumns; a++)
+	{
+		// Every post "space" has a blank div element to start, but it's only interactable if the space is the first in the column.
+		// So, if you have columns of 1 & 4 posts respectively, the 1-post column will have 3 blank spaces, but only the first space, the one after the lone post, is interactable.
+		let newPostSpace = document.createElement("td");
+		let newPost = document.createElement("div");
+		newPostSpace.className = "postSpace";
+		newPostSpace.style.width = "100%";
+		newPostSpace.style.height = rowHeight + "px";
+		// TO DO: Check if this attribute is necessary; I'm not too sure it is since all the post divs are serialized now...
+		newPostSpace.id = "postSpace_" + numRows + "_" + (a+1);
+		newPost.className = "post";
+		// If the row being built is the one right after a column's lowest post, make the post space at that column and row interactable.
+		if(numRows <= columnDepths[a]+1)
+		{
+		    newPost.className += " interactablePost";
+		}
+		newPost.style.width = "100%";
+		newPost.style.height = Math.round(rowHeight*0.85) + "px";
+		// Hmm?
+		if(numRows <= columnDepths[a]+1)
+		{
+            newPostSpace.appendChild(newPost);
+		    newRow.appendChild(newPostSpace);
+		}
+	}
+	document.getElementById("board").appendChild(newRow);
+	//console.log("Successfully added new blank row. Max table depth = " + maxTableDepth + "\n");
+	return;
+}
+
+// Delete the last row within the board table, since there's no reason to delete any other row.
+// This should only be called internally, and only when the last post in the longest column is deleted, moved to another column, or resolved.
+function deletePostRow()
+{
+	let lastRowID = "row" + (maxTableDepth-1);
+	let lastRow = document.getElementById(lastRowID);
+	//console.log("lastRowID = " + lastRowID + "\n");
+	//console.log("Row " + maxTableDepth + " acquired, locking on... Fire!");
+	document.getElementById("board").removeChild(lastRow);
+	//console.log("Target eliminated! " + maxTableDepth + " rows remain...");
+	maxTableDepth--;
+	numRows--;
+
+	// This shouldn't fire anymore, but this would be a catch for discrepancies in row number...
+	if(maxTableDepth != numRows)
+	{ console.log("Something's fishy... " + maxTableDepth + " " + numRows + "\n"); }
+	return;
+}
+
+// TO DO: This!
+// Double-check the data input in a form (i.e., just the post creation form for now (2/20/2025)) to ensure that it's fine to add to the database.
+// Namely, this ensures that required values actually are entered, and that ranged values make sense.
+function validateForm()
+{
+    // Ooops that's not very secure haha
+    for(let a = 0; a < document.forms["creationForm"].length; a++)
+    {
+        console.log(document.forms["creationForm"][a] + "&emsp;" + document.forms["creationForm"][a].value);
+    }
+    console.log("gwahahaha boo!");
+    return;
+}
+
+// Filters a column by a given parameter (ex. priority, deadline, age, name).
+// Parameters are target column "col" and filter parameter "filter".
+// TO DO: Move this into the Flask app since there are built in filters and searches in SQL.
+/*function filterTable(col, filter)
+{
+    // Get all posts first...
+
+    // Then sort by some trait they have.
+    return;
+}*/
+
+// Scrapped for now (2/19/2025), because there are really only ~3 columns needed.
+/* Create a new column within the board table.
+// This should be called whenever the "New Column" button is clicked and the necessary prompts are answered.
+function createColumn()
+{
+	return;
+}
+
+// Delete a column within the board table.
+// This should be called whenever the "Delete Column" button is clicked and the necessary prompts are answered.
+// Columns can be non-empty.
+function deleteColumn()
+{
+	return;
+}
+*/
+
+// Makes a given element invisible and intangible. OoOoOo, it's a ghooost.
+// id = DOM ID of HTML element (string)
+function hideThis(id)
+{
+    var ele = document.getElementById(id);
+    if(ele != null)
+    {
+        ele.style.display = "none";
+    }
+    return;
+}
+
+
+
+// Builds a new post from the queried data, then assigns it to a given post space depending on column and sorting conditions.
+// postValues = post values from table "post" (Post object)
+// Return = an HTML div element under the class "post", id "post_id", where "id" is postValues.id
+// TO DO: Figure out sorting conditions. It's likely that you'll use the URL request in conjunction with
+function createPost(postValues)
+{
+    // Create a div that'll house the contents of the target post, style it like the blank posts, and then place it in the table as per given conditions.
+    // Current post layout has a half-and-half or 2/3-and-1/3 set up, with the left side holding title and tasks, and the right side holding priority, deadline, and users.
+    // All the elements should be relative to their parent divs.
+
+    // Get target post from queried posts
+
+    let post = postValues;
+    let postId = post.id;
+
+    // Post base + post columns
+    let postBase = document.createElement("table");
+    postBase.style.width = "100%";
+    postBase.style.height = "100%";
+    postBase.style.border = "3px black solid";
+    postBase.style.borderRadius = "15px";
+    postBase.style.verticalAlign = "text-top";
+    postBase.className = "post interactablePost";
+    postBase.id = "post_" + postId;
+
+    let postRow1 = document.createElement("tr");
+    postRow1.style.maxHeight = "30%";
+    let titleSpace = document.createElement("th");
+    titleSpace.style.width = "100%";
+    titleSpace.style.overflow = "auto";
+    titleSpace.colspan = "2";
+    titleSpace.backgroundColor = "#FFFFFF";
+    let prioritySpace = document.createElement("th");
+    prioritySpace.style.width = "33%";
+    prioritySpace.style.borderRadius = "15px";
+    postRow1.appendChild(titleSpace);
+    postRow1.appendChild(prioritySpace);
+
+
+    // TO DO: Fix this please!
+    let postRow2 = document.createElement("tr");
+    postRow2.style.height = "50%";
+    postRow2.style.maxHeight = "30%";
+    let taskSpace = document.createElement("td");
+    taskSpace.colspan = "2";
+    let deadlineSpace = document.createElement("td");
+    deadlineSpace.style.width = "33%";
+    postRow2.appendChild(taskSpace);
+    postRow2.appendChild(deadlineSpace);
+
+    let postRow3 = document.createElement("tr");
+    postRow3.style.height = "20%";
+    postRow3.style.paddingBottom = "15px";
+    let userSpace = document.createElement("td");
+    userSpace.colspan = "3";
+    userSpace.style.textAlign = "center";
+    userSpace.style.borderRadius = "15px";
+    postRow3.appendChild(userSpace);
+
+
+    // Post elements
+    let postTitle = document.createElement("h1");
+    postTitle.name = postBase.id + "_title";
+    postTitle.style.width = "100%";
+    postTitle.style.height = "50%";
+    postTitle.style.fontSize = "125%";
+    postTitle.style.overflow = "hidden";
+    postTitle.style.overflowWrap = "break-word";
+    postTitle.style.textDecoration = "underline";
+    postTitle.innerHTML = post.title;
+
+    let postTasks = document.createElement("p");
+    postTasks.name = postBase.id + "_tasks";
+    postTasks.style.textAlign = "center";
+    postTasks.style.display = "block";
+    postTasks.style.top = "0px";
+    postTasks.style.verticalAlign = "text-top";
+    postTasks.style.border = "2px solid pink";
+    postTasks.style.borderRadius = "15px";
+    // Truncate long tasks
+    if(post.tasks.length >= 96)
+    {
+        //postTasks.style.backgroundColor = "orchid";
+        let cutTasks = post.tasks.substring(0, 96);
+        cutTasks = cutTasks.substring(0, cutTasks.lastIndexOf(' ')) + "...";
+        postTasks.innerHTML = cutTasks;
+    }
+    else
+    {
+        postTasks.innerHTML = post.tasks;
+    }
+
+    let postPriority = document.createElement("span");
+    postPriority.name = postBase.id + "_priority";
+    postPriority.style.width = "100%";
+    postPriority.style.textAlign = "center";
+    postPriority.style.fontSize = "90%";
+    postPriority.innerHTML = "Priority:\n";
+
+    switch(post.priority)
+    {
+        case(0):
+            postPriority.innerHTML += "Low";
+            prioritySpace.style.backgroundColor = "#7becf1";
+            break;
+        case(1):
+            postPriority.innerHTML += "\nNot Critical";
+            prioritySpace.style.backgroundColor = "#97a6f4";
+            break;
+        case(2):
+            postPriority.innerHTML += "Normal";
+            prioritySpace.style.backgroundColor = "#c0c0c0";
+            break;
+        case(3):
+            postPriority.innerHTML += "High";
+            prioritySpace.style.backgroundColor = "#fab166";
+            break;
+        default:
+            postPriority.innerHTML += "Low";
+            prioritySpace.style.backgroundColor = "#c0c0c0";
+            break;
+    }
+
+    let postDeadline = document.createElement("p");
+    postDeadline.name = postBase.id + "_deadline";
+    postDeadline.style.width = "100%";
+    postDeadline.style.height = "20%";
+    postDeadline.style.top = "0px";
+    postDeadline.style.borderRadius = "15px";
+    postDeadline.innerHTML = "Due by:&#10;" + post.deadline.substring(0, post.deadline.lastIndexOf(','));
+
+    let postUserBase = document.createElement("div");
+    postUserBase.name = postBase.id + "_userBase";
+    postUserBase.style.textAlign = "center";
+    postUserBase.innerHTML = "Who's Responsible:  " + post.taggedUser;
+
+    // TO DO: Implement post settings and an "editPost" function for later adjustments
+    // When clicked, opens a new window + form to edit the post in question. You'll need to figure out how
+    //let postSettings = document.createElement("img");
+
+    // Creating the final div
+    titleSpace.appendChild(postTitle);
+    prioritySpace.appendChild(postPriority);
+    taskSpace.appendChild(postTasks);
+    deadlineSpace.appendChild(postDeadline);
+    userSpace.appendChild(postUserBase);
+
+    postBase.appendChild(postRow1);
+    postBase.appendChild(postRow2);
+    postBase.appendChild(postRow3);
+
+    return postBase;
+}
+
+//
+
+// Deletes the post this is called for, removing it from the board and from the database.
+// TO DO: It'd be neat if there was a recycle bin for this, like a separate table where deleted posts move to in the DB. They'd expire after 3 days or so.
+// NOTE: To do this, it'd be best to handle the deletion (like all other database things aside from form submission) in Flask.
+function deletePost(postID)
+{
+    alert("Oh no!");
+    return;
+}
+
+// Creates a document body element that darkens the screen. Meant to be used with prompt windows.
+// There were a lot of spots where the same creation code was, so this function was made for better readability.
+function createDarkFilter()
+{
+    if(document.getElementById("darkFilter") == null)
+	{
+	    console.log("Dark filter does not exist; creating now...")
+
+	    let darkFilter = document.createElement("div");
+	    darkFilter.class = "filter";
+	    darkFilter.id = "darkFilter";
+
+	    // Styling the background
+	    darkFilter.style.display = "none";
+	    darkFilter.style.zIndex = "1";
+	    darkFilter.style.width = "100%";
+	    darkFilter.style.height = "100%";
+	    darkFilter.style.left = 0;
+	    darkFilter.style.top = 0;
+	    darkFilter.style.position = "fixed";
+	    darkFilter.style.overflow = "auto";
+	    darkFilter.style.backgroundColor = "black";
+	    darkFilter.style.opacity = "0.5";
+	    darkFilter.onclick = function() {
+	        hideThis("darkFilter");
+	        hideThis("creationWindow");
+	        hideThis("filterWindow");
+	        hideThis("summarizeWindow");
+	        hideThis("helpWindow");
+	    };
+
+	    document.body.appendChild(darkFilter);
+	}
+}
+
+// Adds CSS styling to a form window / modal, since just adding a class with styling in the CSS file doesn't seem to work.
+// aWindow = The window to stylize (HTML element (div))
+function stylizeWindow(aWindow)
+{
+    aWindow.style.display = "none";
+    aWindow.style.position = "fixed";
+    aWindow.style.width = "50%";
+    aWindow.style.height = "auto";
+    aWindow.style.lineHeight = "2";
+    aWindow.style.textAlign = "center";
+    aWindow.style.margin = "auto";
+    aWindow.style.top = "25%";
+    aWindow.style.left = "25%";
+    aWindow.style.backgroundColor = "white";
+    aWindow.style.border = "2px solid #888";
+    aWindow.style.zIndex = "1";
+}
+
+// Brings up the post creation modal for whichever column this function was called from. It can be cancelled with the "Cancel" button or by clicking off the modal.
+// Submitting posts the inputs to the database and refreshes the site.
+// name = Name of the column the post will be added under (string)
+function promptPost(name)
+{
+	console.log("Making a new post under: " + name + "\n");
+
+	// If the creation window and background haven't been made yet, make them, then reveal them after they're completed.
+	// Apparently these windows are called "modals"! I'm not going to change the names here, but that's still something new.
+
+	createDarkFilter();
+
+	if(document.getElementById("creationWindow") == null)
+	{
+	    console.log("Creation window does not exist; creating now...");
+
+	    // Window base
+	    let creationWindow = document.createElement("div");
+	    creationWindow.id = "creationWindow";
+	    document.body.appendChild(creationWindow);
+	    //console.log(document.getElementById("creationWindow"));
+	    let creationForm = document.createElement("form");
+	    creationForm.action = ".";
+	    creationForm.method = "POST";
+	    creationForm.name = "creationForm";
+	    // what's this?
+	    Object.defineProperty(document, "referrer", {post: function(){return "https://www.pythonanywhere.com/user/CGuiangInPain/files/home/CGuiangInPain/mysite/templates/Test HTML Kanban Board v2.html"}});
+	    creationForm.onsubmit = "validateForm()";
+
+	    // Form title
+	    let creationTitle = document.createElement("h1");
+	    creationTitle.id = "creationTitle";
+	    creationTitle.style.fontSize = "30px";
+	    creationTitle.style.textDecoration = "underline";
+	    creationTitle.innerHTML = "New Post into: " + name;
+
+
+	    // Input fields + labels
+	    let titleInput = document.createElement("input");
+	    titleInput.type = "text";
+	    titleInput.id = "postTitle";
+	    titleInput.name = "postTitle";
+	    let titleLabel = document.createElement("label");
+	    titleLabel.for = titleInput.id;
+	    titleLabel.innerHTML = "Title:&emsp;";
+
+	    let priorityInputs = [];
+
+	    let priorityLabel = document.createElement("label");
+	    for(let a = 0; a < 4; a++)
+	    {
+	        let newRadio = document.createElement("input");
+	        newRadio.type = "radio";
+	        newRadio.name = "postPriority";
+	        newRadio.id = "postPriority" + a;
+	        newRadio.value = a;
+
+	        let newRadioLabel = document.createElement("label");
+	        newRadioLabel.for = newRadio.id;
+	        newRadioLabel.innerHTML = "&emsp;" + priorityValues[a] + "  ";
+
+	        priorityInputs.push(newRadioLabel);
+	        priorityInputs.push(newRadio);
+	    }
+	    console.log(priorityInputs.length);
+	    priorityLabel.for = "postPriority0";
+	    priorityLabel.innerHTML = "Priority:&emsp;";
+
+	    let taskInput = document.createElement("textarea");
+	    taskInput.id = "postTask";
+	    taskInput.name = "postTask";
+	    let taskLabel = document.createElement("label");
+	    taskLabel.for = taskInput.id;
+	    taskLabel.innerHTML = "Tasks:&emsp;";
+
+	    let deadlineInput = document.createElement("input");
+	    deadlineInput.type = "date";
+	    deadlineInput.name = "postDeadline";
+	    let deadlineLabel = document.createElement("label");
+	    deadlineLabel.innerHTML = "Due on: ";
+
+        // TO DO: Implement a system for multiple users to be responsible for a project.
+	    let userInput = document.createElement("input");
+	    userInput.type = "text";
+	    userInput.id = "postUser";
+	    userInput.name = "postUser";
+	    let userLabel = document.createElement("label");
+	    userLabel.for = userInput.id;
+	    userLabel.innerHTML = "Who's in charge of this?&emsp;";
+
+	    let columnInput = document.createElement("input");
+	    columnInput.value = name;
+	    columnInput.type = "hidden";
+	    columnInput.id = "postColumn";
+	    columnInput.name = "postColumn";
+
+	    let submitInput = document.createElement("input");
+	    submitInput.name = "creationSubmit";
+	    submitInput.type = "submit";
+	    submitInput.value = "Submit";
+	    submitInput.onclick = "validateForm()";
+
+	    let resetInput = document.createElement("input");
+	    resetInput.type = "reset";
+	    resetInput.value = "Reset";
+
+	    // Styling the window
+	    creationWindow.class = "window";
+	    stylizeWindow(creationWindow);
+
+	    // Appending and styling the elements within the window
+	    creationForm.appendChild(creationTitle);
+	    creationForm.appendChild(titleLabel);
+	    creationForm.appendChild(titleInput);
+	    creationForm.appendChild(document.createElement("br"));
+	    creationForm.appendChild(priorityLabel);
+	    for(let b = 0; b < priorityInputs.length; b++)
+	    {
+	        creationForm.appendChild(priorityInputs[b]);
+	    }
+	    creationForm.appendChild(document.createElement("br"));
+	    creationForm.appendChild(taskLabel);
+	    creationForm.appendChild(taskInput);
+	    creationForm.appendChild(document.createElement("br"));
+	    creationForm.appendChild(deadlineLabel);
+	    creationForm.appendChild(deadlineInput);
+	    creationForm.appendChild(document.createElement("br"));
+	    creationForm.appendChild(userLabel);
+	    creationForm.appendChild(userInput);
+	    creationForm.appendChild(document.createElement("br"));
+	    creationForm.appendChild(columnInput);
+	    creationForm.appendChild(submitInput);
+	    creationForm.appendChild(resetInput);
+
+	    creationWindow.appendChild(creationForm);
+	    //document.body.appendChild(creationWindow);
+	}
+
+    //console.log(document.getElementById("creationWindow"));
+    //console.log(document.getElementById("darkFilter"));
+
+    // Reveal the window
+    document.getElementById("darkFilter").style.display = "block";
+    // creationForm.style.display = "block";
+    document.getElementById("creationTitle").innerHTML = "New Post into: " + name;
+	document.getElementById("creationWindow").style.display = "block";
+
+	return;
+}
+
+// Brings up a filter menu to allow for post sorting.
+function filterTable()
+{
+    console.log("Entering some new filters?");
+
+    createDarkFilter();
+
+	if(document.getElementById("filterWindow") == null)
+	{
+	    // Window base
+	    let filterWindow = document.createElement("div");
+	    filterWindow.id = "filterWindow";
+	    document.body.appendChild(filterWindow);
+	    let filterForm = document.createElement("form");
+	    filterForm.action = ".";
+	    filterForm.method = "POST";
+	    filterForm.name = "filterForm";
+	    // what's this?
+	    Object.defineProperty(document, "referrer", {post: function(){return "https://www.pythonanywhere.com/user/CGuiangInPain/files/home/CGuiangInPain/mysite/templates/Test HTML Kanban Board v2.html"}});
+
+	    // Form title
+	    let filterTitle = document.createElement("h1");
+	    filterTitle.id = "filterTitle";
+	    filterTitle.style.fontSize = "30px";
+	    filterTitle.style.textDecoration = "underline";
+	    filterTitle.innerHTML = "Filters";
+
+	    // Form inputs
+	    let typeInputs = [];
+	    let typeLabel = document.createElement("label");
+	    typeLabel.id = "typeLabel";
+	    typeLabel.innerHTML = "Sort by:&emsp;";
+	    for(let a = 0; a < priorityValues.length; a++)
+	    {
+	        let newRadio = document.createElement("input");
+	        newRadio.type = "radio";
+	        newRadio.name = "filterType";
+	        newRadio.id = "filterType" + a;
+	        newRadio.value = a;
+
+	        let newRadioLabel = document.createElement("label");
+	        newRadioLabel.for = newRadio.id;
+	        newRadioLabel.innerHTML = "&emsp;" + priorityValues[a] + "  ";
+
+	        typeInputs.push(newRadioLabel);
+	        typeInputs.push(newRadio);
+	    }
+	    typeLabel.for = "filterType0";
+
+	    let orderInput = document.createElement("input");
+	    orderInput.type = "checkbox";
+	    orderInput.name = "filterOrder";
+	    orderInput.id = "filterOrder";
+	    orderInput.checked = "false";
+	    orderInput.value = 1;
+	    let orderLabel = document.createElement("label");
+	    orderLabel.id = "orderLabel";
+	    orderLabel.innerHTML = "Use ascending order:&emsp;";
+	    orderLabel.for = "filterOrder";
+
+	    let submitInput = document.createElement("input");
+	    submitInput.name = "filterSubmit";
+	    submitInput.type = "submit";
+	    submitInput.value = "Submit";
+	    submitInput.onclick = "validateForm()";
+
+	    let resetInput = document.createElement("input");
+	    resetInput.type = "reset";
+	    resetInput.value = "Reset";
+
+	    // Create window
+	    filterForm.appendChild(filterTitle);
+	    //filterForm.appendChild(document.createElement("br"));
+	    filterForm.appendChild(typeLabel);
+	    for(let b = 0; b < typeInputs.length; b++)
+	    {
+	        filterForm.appendChild(typeInputs[b]);
+	    }
+	    filterForm.appendChild(document.createElement("br"));
+	    filterForm.appendChild(orderLabel);
+	    filterForm.appendChild(orderInput);
+	    filterForm.appendChild(document.createElement("br"));
+	    filterForm.appendChild(submitInput);
+	    filterForm.appendChild(resetInput);
+
+	    filterWindow.class = "window";
+	    stylizeWindow(filterWindow);
+	    filterWindow.appendChild(filterForm);
+
+	}
+
+	// Show the window
+	document.getElementById("darkFilter").style.display = "block";
+	document.getElementById("filterWindow").style.display = "block";
+
+	return;
+}
+
+// Creates a summary of posted projects, bringing up anomalies and notable points about any given project.
+function summarizeTable()
+{
+    alert("pending...\n");
+    return;
+}
+
+// Submits changes made to the post order and columns for later commits to the database.
+// TO DO: This! It'll have to feature a way to enter values for lastDepth, which is superseded by sorting and filtering. (maybe, it's up to you).
+// Remember that sorting and filtering are done in Flask, primarily.
+function submitChanges()
+{
+    alert("submit what?\n");
+    return;
+}
+
+// Brings up a help window featuring information about how to use the site.
+function getHelp()
+{
+    let helpWindow = document.createElement("div");
+    helpWindow.id = "helpWindow";
+    document.body.appendChild(helpWindow);
+    
+    let helpTitle = document.createElement("h1");
+    helpTitle.id = "filterTitle";
+    helpTitle.style.fontSize = "30px";
+    helpTitle.style.textDecoration = "underline";
+    helpTitle.innerHTML = "How to Use this Site";
+    
+    let 
+    
+    return;
+}
+
+// Brings up a settings window featuring table configuration options like column creation, renaming, and deletion, post configuration options like clearing everything, etc.
+function getSettings()
+{
+    
+}
+
+// Remove all posts from the board and the database. This should be an internal function, maybe accessible from settings.
+function clearAllPosts()
+{
+	for(let a = numRows; a > 0; a--)
+	{
+		deletePostRow();
+	}
+	console.log("All posts cleared from board.\n");
+	// TO DO: Figure out post back-end... but later.
+
+	return;
+}
+
+/* [][][] FINAL DISPLAYS [][][] */
+
+// Fill all posts using the queried posts from the database. Namely, replaces the empty posts created during row creation.
+function populateAll()
+{
+    // For some reason, the global variables don't work all that well, at least in terms of the ones with queried values. Maybe it's worth it to write them to a file, but for now this will do.
+    queriedColumns = JSON.parse(document.getElementById("queriedColumns").innerHTML).columns;
+    queriedPosts = JSON.parse(document.getElementById("queriedPosts").innerHTML).posts;
+
+    // Generic counter to later check against total posts "totalPosts".
+    let postsPopulated = 0;
+
+    let currentDepths = [0, 0, 0];
+
+    //console.log(queriedPosts);
+
+    for(let a of queriedPosts)
+    {
+        // Create each post
+        // createPost(a) creates a new post as a div element using the values of the queried post with id "a".
+        let newPost = createPost(a);
+        console.log("wallawalla");
+
+        //console.log(newPost); This works, it has all the components
+
+        // Place each post
+        // Get the post column (referencing the index in columnNames too) for column placement, and the post depth from the inherent value if it has it, or from the current column depth from columnDepths.
+        // For each column, find all posts with whose column name matches. Then, populate the post spaces from the top down, going by the last depth if they have it, OR the id (ascending) if not.
+        for(let col of queriedColumns)
+        {
+            if(a.tableColumn == col.name)
+            {
+                //console.log("column id = " + col.id);
+                // Checks if the depth is going over the listed depth of the column, which shouldn't happen. If it does, then bail.
+                if(currentDepths[col.id-1] > columnDepths[columnDepths.indexOf(col.name)])
+                {
+                    console.log("A post tried to be placed after the depth of the column, what happened?");
+                    break;
+                }
+                // Otherwise, carry on by processing the post.
+                currentDepths[col.id-1] += 1;
+                //console.log(currentDepths);
+                //console.log("currentDepths[col.id-1] = " + currentDepths[col.id-1]);
+
+                let postId = "post_" + a.id;
+                let targetId = "postSpace_" + currentDepths[col.id-1] + "_" + (columnNames.indexOf(col.name)+1);
+                //console.log("Going into " + targetId);
+                //console.log(newPost);
+                processPost(0, newPost, postId, targetId);
+            }
+        }
+
+        // Hmm a hacky sort of fix hmmmmm
+        // yooooo it works
+        let interactablePosts = document.getElementsByClassName("interactablePost");
+        for(let post of interactablePosts)
+        {
+            post.ondragover = (event) => {event.preventDefault();};
+            post.ondrop = (event) => {
+                event.preventDefault();
+                console.log("ondrop starting!");
+                console.log(event);
+                let fromPost = event.dataTransfer.getData("text/html");
+                let fromPostId = event.dataTransfer.getData("text/plain");
+                console.log("fromPost has type = " + typeof(fromPost));
+                console.log(event.target);
+                console.log(event.target.parentNode);
+                console.log(event.target.parentNode.parentNode);
+                console.log("I'm ooold!");
+                console.log(event.target.parentNode.parentNode.parentNode);
+                // Ininitialized interactable post (i.e., a full post that's being dropped on at its lower right corner, because everything else counts as another element in the post :P  )
+                if(event.target.className.indexOf("interactablePost") != -1 && event.target.innerHTML != null)
+                {
+                    processPost(0, fromPost, fromPostId, event.target.id);
+                    console.log("Post processed!\n");
+                }
+                // Blank interactable posts
+                else if (event.target.className.indexOf("interactablePost") != -1 && event.target.innerHTML == null)
+                {
+                    l
+                }
+                // Child elements of an initialized interactable post
+                else if (event.target.parentNode.parentNode)
+                else
+                {
+                    console.log("This HTML element isn't interactable, sorry...");
+                }
+            };
+
+            // Posts become draggable if they're populated; if they're a blank space, they can only be dropped into.
+            if(post.innerHTML != null)
+            {
+                post.ondragstart = (event) => {
+                    console.log("ondragstart starting!");
+                    console.log(event);
+                    event.dataTransfer.setData("text/html", event.target.innerHTML);
+                    event.dataTransfer.setData("text/plain", event.target.id);
+                    //event.dataTransfer.setData("text/html", "<img src=\"static/very_important.gif\">");
+                    console.log("ondragstart completed!");
+                };
+                post.draggable = "true";
+            }
+        }
+
+        postsPopulated++;
+    }
+    console.log("Board populated with " + postsPopulated + " posts!");
+	return;
+}
+
+// Creates pretty much everything on the site while formatting it.
+function formatAll()
+{
+	document.getElementById("title").style.left = "33%";
+	formatAsColumns("columnHeader");
+
+	// Make as many rows as there are posts in the longest column.
+	// So, these parsed JSON objects have attributes instead of elements, which makes sense, I guess. They aren't lists in that usual list manipulation and navigation doesn't work, but they act like lists in that they hold data.
+	queriedColumns = JSON.parse(document.getElementById("queriedColumns").innerHTML).columns;
+    //console.log("queriedColumns is type: " + typeof(queriedColumns));
+    //console.log("queriedColumns has the following attributes: " + Object.keys(queriedColumns));
+    console.log(queriedColumns);
+    queriedPosts = JSON.parse(document.getElementById("queriedPosts").innerHTML).posts;
+    //console.log("queriedPosts is type: " + typeof(queriedPosts));
+    //console.log("queriedPosts has the following attributes: " + Object.keys(queriedPosts));
+    console.log(queriedPosts);
+    totalPosts = queriedPosts.length;
+
+    // Get column names and depths.
+    for(let col of queriedColumns)
+    {
+        columnNames.push(col.name);
+        columnDepths.push(col.depth);
+    }
+    console.log("The present columns are: " + columnNames);
+    console.log("Their depths are: " + columnDepths);
+    // Max table depth is 1 over the max column depth to allow for a final interactable post space in the longest column.
+    maxTableDepth = Math.max(...columnDepths) + 1;
+
+	for(let a = numRows; a < maxTableDepth; a++)
+	{
+		console.log("Row " + (a+1) + "\n");
+		createPostRow();
+	}
+	formatAsColumns("postSpace");
+
+    console.log("All clear");
+    populateAll();
+    console.log("All clear, for real");
+
+	return;
+}
+
+
+
+

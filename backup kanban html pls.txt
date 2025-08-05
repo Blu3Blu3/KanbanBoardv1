@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Kanban Board</title>
+		<link rel="stylesheet" href="https://www.pythonanywhere.com/user/CGuiangInPain/files/home/CGuiangInPain/mysite/static/Test Kanban Board CSS.css">
+		<script src="https://www.pythonanywhere.com/user/CGuiangInPain/files/home/CGuiangInPain/mysite/static/Test Kanban Board JS.js"></script>
+	</head>
+
+	<!-- TO DO: Have all formatting and data entry happen when the body of the site loads. -->
+	<body onload="formatAll()">
+		<div id="banner">
+			<span class="test" id="filterTable"><img class="bannerImage" src="static/Filter Icon.png" onclick="filterTable()" width="100" height="100"></span>
+			<span class="test" id="title">Test Kanban Board</span>
+			<span class="test" id="clearAllPosts"><img class="bannerImage" src="static/Transparent X.png" onclick="clearAllPosts()" width="100" height="100"></span>
+		</div>
+		<table id="board">
+			<caption>
+			<tr id="header">
+				<!-- TO DO: Fix the row numbers of the logging statements; they're off by "maxTableDepth". Other than that, though, the row creation and deletion buttons work properly. -->
+				<th id="Current Projects" class="columnHeader" onclick="createPost(this.id)"><a>Current Projects</a></th>
+				<th id="Completed" class="columnHeader" onclick="createPost(this.id)"><a>Completed</a></th>
+				<th id="Ongoing Projects" class="columnHeader" onclick="createPost(this.id)"><a>Ongoing Projects</a></th>
+			</tr>
+		</table>
+		<br>
+		<br>
+		<p id="debug" onclick="beAlright()">
+			To do:
+			<br>Pin down a first format and get it set up, then work on backend to make kanban posts for the projects.
+			<br><span style="color: indigo">[DONE!] </span>Fix that first post cell, since the post cells' widths are linked to those of the header cells.
+			<br><span style="color: indigo">[DONE!] </span>Figure out what kind of DB you'll use, if any; to be honest, a CSV or JSON will do. [Nope! We're going full MySQL!]
+			<br><span style="color: indigo">[DONE!] </span>Find a way to have a fixed banner like you do on the bottom, but with the text fixed.
+		</p>
+	</body>
+</html>
