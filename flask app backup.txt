@@ -1,0 +1,80 @@
+from flask import Flask, render_template, url_for, redirect, request, flash, session
+from flask_sqlalchemy import SQLAlchemy
+from typing import List
+from sqlalchemy.orm import Session, Mapped, mapped_column, DeclarativeBase, relationship
+from datetime import datetime
+# Only used for "os.urandom()" in the past website.
+import os
+# Only used for SHA256 encryption. May or may not be needed here, but figure that out later.
+import hashlib
+
+app = Flask(__name__)
+app.config["DEBUG"] = True
+
+"""
+SQLALCHEMY_DATABASE_URI = "mysql+mysqlconnector://{username}:{password}@{hostname}/{databasename}".format(
+    username="CGuiangInPain",
+    password="Database?But-1'mEngaged!",
+    hostname="CGuiangInPain.mysql.pythonanywhere-services.com",
+    databasename="CGuiangInPain$Kanban",
+)
+app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+app.config["SQLALCHEMY_POOL_RECYCLE"] = 299
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+"""
+
+app.config["SQLALCHEMY_DATABASE_URI"] = "CGuiangInPain.mysql.pythonanywhere-services.com"
+#app.config["SECRET KEY"] = "walkman"
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    # Should be auto-incremented...
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String, nullable = False, unique = True, index = True)
+    taggedIn: Mapped[List["Post"]] = db.relationship()
+    lastResolved = db.Column(db.Date, nullable = False)
+    phoneNum = db.Column(db.String)
+    email = db.Column(db.String)
+    def __repr__(self):
+        return "<User % r>" % self.name
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    title = db.Column(db.String, nullable = False, index = True)
+    priority = db.Column(db.String, index = True)
+    tasks = db.Column(db.TEXT())
+    deadline = db.Column(db.Date, nullable = False, index = True)
+    createdOn = db.Column(db.Date, default = datetime.utcnow)
+    taggedUser = db.Column(db.String, nullable = False)
+    createdBy = db.Column(db.Integer, default = -10)
+
+    def __repr__(self):
+        return "<This post's ID is % r>" % self.id
+
+    def save(self):
+        db.sesion.add(self)
+
+with app.app_context():
+    db.create_all()
+
+
+
+# Do you really want to paginate things so early in development? It seems easier to keep everything on the same page, literally.
+@app.route("/", methods = ["GET", "POST"])
+def displayAll():
+    # If a post has all its info entered and the creation window's Submit button is clicked, go to here
+    if request.method == "POST":
+        # Make the Post object
+        title = request.form["titleInput"]
+        priority = request.form["priorityInput"]
+        tasks = request.form["tasksInput"]
+        deadline = request.form["deadlineInput"]
+        taggedUser = request.form["userInput"]
+        newPost = Post(id = session["id"], title = title, priority = priority, tasks = tasks, deadline = deadline, taggedUser = taggedUser)
+        db.session.add(newPost)
+        db.session.commit()
+        flash("Post successful!")
+        return render_template("Test HTML Kanban Board 2.html")
+
+    return render_template(url_for('displayAll'))
+
